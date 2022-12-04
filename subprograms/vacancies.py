@@ -1,4 +1,5 @@
 import csv
+import functools
 import re
 from openpyxl import Workbook
 from openpyxl.reader.excel import load_workbook
@@ -13,6 +14,12 @@ from jinja2 import Environment, FileSystemLoader
 import pdfkit
 from unittest import TestCase
 import cProfile
+from multiprocessing import Pool
+import os
+import glob
+from collections import Counter
+from functools import reduce
+from itertools import groupby
 
 
 class Salary:
@@ -356,7 +363,8 @@ class DataSet:
                     vacancies_average_salary_by_year_selected_name[year] = [vacancy.salary.rub_salary]
                 else:
                     vacancies_average_salary_by_year_selected_name[year].append(vacancy.salary.rub_salary)
-
+        vacancies_salary_sum_by_year = {}
+        
         for key in vacancies_average_salary_by_year:
             vacancies_average_salary_by_year[key] = int(mean(vacancies_average_salary_by_year[key]))
         for key in vacancies_average_salary_by_year_selected_name:
@@ -386,7 +394,10 @@ class DataSet:
                vacancies_count_by_year_selected_name, \
                vacancies_top_average_salary_by_city, \
                vacancies_fraction_by_city, \
-               vacancy_name
+               vacancy_name, \
+               vacancies_count_by_city, \
+                vacancies_average_salary_by_city 
+               
 
 
 # file_name = input("Введите название файла: ")
@@ -650,40 +661,100 @@ class Report:
 # report.generate_image()
 # report.generate_pdf()
 
-def re_parse_year(date_string):
-    return re.findall(r'(\d{4})-(\d{1,2})-(\d{1,2})', date_string)[0][0]
+# def re_parse_year(date_string):
+#     return re.findall(r'(\d{4})-(\d{1,2})-(\d{1,2})', date_string)[0][0]
+#
+#
+# def parse_datetime(date_string):
+#     """Парсер даты.
+#
+#     Returns:
+#         datetime: Дата полученная с помощью strptime
+#     """
+#     return datetime.strptime(date_string, "%Y-%m-%dT%H:%M:%S%z")
+#
+#
+# testData = DataSet("vacancies_by_year.csv").vacancies_objects
+#
+#
+# def slice_parse_year(date_string):
+#     return date_string[0:4]
+#
+#
+# def parse_datetimes_from_vacancies(dataset_vacancies, func):
+#     for vacancy in dataset_vacancies:
+#         func(vacancy.published_at)
+#
+#
+# def test_datetime_parser(dataset_vacancies, func):
+#     cProfile.runctx('parse_datetimes_from_vacancies(dataset_vacancies, func)',
+#                     {'func': func, 'dataset_vacancies': dataset_vacancies,
+#                      "parse_datetimes_from_vacancies": parse_datetimes_from_vacancies}, {}, None, "cumtime")
+#
+#
+# print("strptime")
+# test_datetime_parser(testData, parse_datetime)
+# print("re")
+# test_datetime_parser(testData, re_parse_year)
+# print("slice")
+# test_datetime_parser(testData, slice_parse_year)
+# dataset_test = DataSet("./chunks/2007.csv")
+# print(dataset_test.process_vacancies("Аналитик"))
+
+# Возможно придется возвращать vacancies_count_by_city и vacancies_average_salary_by_city для каждого из процессов,
+# а затем в итоговом сконкатенированном массиве проводить окончательную обработку по процентам.
+
+def concat_vacancy_dictionaries(dictionaries):
+    """Склеивает словари в один"""
+    result = {k: v for d in dictionaries for k, v in d.items()}
+    return {key:value for key, value in sorted(result.items(), key=lambda item: int(item[0]))}
+
+if __name__ == "__main__":
+    with Pool() as pool:
+        dataSets = pool.imap_unordered(DataSet, glob.glob("./subprograms/chunks/*.csv"))
+        dataSets_with_vacancy_name = [(x,"Аналитик") for x in dataSets]
+        processed_vacancies = list(pool.starmap(DataSet.process_vacancies, dataSets_with_vacancy_name))
+        vacancies_average_salary_by_year = concat_vacancy_dictionaries([item[0] for item in processed_vacancies])
+
+        print(vacancies_average_salary_by_year)
+        vacancies_count_by_year = concat_vacancy_dictionaries([item[1] for item in processed_vacancies])
+        vacancies_average_salary_by_year_selected_name = concat_vacancy_dictionaries([item[2] for item in processed_vacancies])
+        vacancies_count_by_year_selected_name = concat_vacancy_dictionaries([item[3] for item in processed_vacancies])
+        print(vacancies_count_by_year)
+        print(vacancies_average_salary_by_year_selected_name)
+        print(vacancies_count_by_year_selected_name)
+        vacancies_count_by_city = reduce(lambda x, y: x + y, [Counter(item[7]) for item in processed_vacancies])
+        # Найти общую сумму зарплат по городам (многомилионную), найти int mean
+        # vacancies_average_salary_by_city = reduce(lambda x, y: x + y, [Counter(item[8]) for item in processed_vacancies])
+        
+        
+        city_count = sum(vacancies_count_by_city.values())
+        one_percent = floor(city_count / 100)
+        # print(vacancies_count_by_city)
+        # print(vacancies_average_salary_by_city)
+        vacancies_fraction_by_city = {k: round(v / city_count, 4)
+                                      for k, v in sorted(vacancies_count_by_city.items(),
+                                                         reverse=True,
+                                                         key=lambda item: item[1])
+                                      if v >= one_percent}
+        
+        print(vacancies_fraction_by_city)
+        vacancies_top_average_salary_by_city = {k: v
+                                                for k, v in sorted(vacancies_average_salary_by_city.items(),
+                                                                   reverse=True,
+                                                                   key=lambda item: item[1])
+                                                if vacancies_count_by_city[k] >= one_percent}
+        print(vacancies_top_average_salary_by_city)
+        # vacancies_top_average_salary_by_city = []
+        # vacancies_fraction_by_city = []
+        # print(vacancies_average_salary_by_year)
+        # first = functools.reduce(lambda x, y: y[0].update(x[0]), processed_vacancies)
+        # first = functools.reduce(lambda x, y: Counter(x[0]) + Counter(y[0]), processed_vacancies)
+
+        
+    
 
 
-def parse_datetime(date_string):
-    """Парсер даты.
-
-    Returns:
-        datetime: Дата полученная с помощью strptime
-    """
-    return datetime.strptime(date_string, "%Y-%m-%dT%H:%M:%S%z")
 
 
-testData = DataSet("vacancies_by_year.csv").vacancies_objects
 
-
-def slice_parse_year(date_string):
-    return date_string[0:4]
-
-
-def parse_datetimes_from_vacancies(dataset_vacancies, func):
-    for vacancy in dataset_vacancies:
-        func(vacancy.published_at)
-
-
-def test_datetime_parser(dataset_vacancies, func):
-    cProfile.runctx('parse_datetimes_from_vacancies(dataset_vacancies, func)',
-                    {'func': func, 'dataset_vacancies': dataset_vacancies,
-                     "parse_datetimes_from_vacancies": parse_datetimes_from_vacancies}, {}, None, "cumtime")
-
-
-print("strptime")
-test_datetime_parser(testData, parse_datetime)
-print("re")
-test_datetime_parser(testData, re_parse_year)
-print("slice")
-test_datetime_parser(testData, slice_parse_year)
