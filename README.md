@@ -20,3 +20,7 @@
 
 ### string slice [:]
 <img src="screenshots/profiling-screenshots/profile-5.png" alt="unittests">
+
+## Chunk-splitter result
+<img src="screenshots/chunks.png"></img>
+
