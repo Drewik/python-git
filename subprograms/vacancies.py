@@ -18,10 +18,9 @@ from multiprocessing import Pool
 import os
 import glob
 from collections import Counter
-from functools import reduce
-from itertools import groupby
-import copy
-
+from functools import reduce, partial, partialmethod
+import time
+from concurrent.futures import ProcessPoolExecutor
 
 class Salary:
     """Класс для представления зарплаты.
@@ -320,9 +319,8 @@ class DataSet:
             vacancies_average_salary_by_year_selected_name (dict): Динамика уровня зарплат по годам
                                                                                                 для выбранной профессии
             vacancies_count_by_year_selected_name (dict): Динамика количества вакансий по годам для выбранной профессии
-            vacancies_top_average_salary_by_city (dict): Уровень зарплат по городам (в порядке убывания) - только
-                                                                                                    первые 10 значений
-            vacancies_fraction_by_city (dict): Доля вакансий по городам
+            vacancies_count_by_city (dict): Количество вакансий по городам
+            vacancies_salary_sum_by_city (dict): Сумма зарплат по городам
             vacancy_name (str): Название вакансии
         """
         vacancies_average_salary_by_year = {}
@@ -371,60 +369,67 @@ class DataSet:
             if vacancies_average_salary_by_year_selected_name[key] != 0:
                 vacancies_average_salary_by_year_selected_name[key] = int(
                     mean(vacancies_average_salary_by_year_selected_name[key]))
-                    
-        vacancies_average_salary_by_city = {}
-        for key in vacancies_salary_sum_by_city:
-            vacancies_average_salary_by_city[key] = int(mean(vacancies_salary_sum_by_city[key]))
-
-
-        city_count = sum(vacancies_count_by_city.values())
-        one_percent = floor(city_count / 100)
-
-        vacancies_fraction_by_city = {k: round(v / city_count, 4)
-                                      for k, v in sorted(vacancies_count_by_city.items(),
-                                                         reverse=True,
-                                                         key=lambda item: item[1])
-                                      if v >= one_percent}
-        vacancies_top_average_salary_by_city = {k: v
-                                                for k, v in sorted(vacancies_average_salary_by_city.items(),
-                                                                   reverse=True,
-                                                                   key=lambda item: item[1])
-                                                if vacancies_count_by_city[k] >= one_percent}
 
         return vacancies_average_salary_by_year, \
                vacancies_count_by_year, \
                vacancies_average_salary_by_year_selected_name, \
                vacancies_count_by_year_selected_name, \
-               vacancies_top_average_salary_by_city, \
-               vacancies_fraction_by_city, \
-               vacancy_name, \
                vacancies_count_by_city, \
                vacancies_salary_sum_by_city, \
-               one_percent,
-               
-# vacancies_fraction_by_city = {k: round(v / city_count, 4)
-#                                 for k, v in sorted(vacancies_count_by_city.items(),
-#                                                     reverse=True,
-#                                                     key=lambda item: item[1])
-#                                 if v >= one_percent}
-# vacancies_top_average_salary_by_city = {k: v
-#                                         for k, v in sorted(vacancies_average_salary_by_city.items(),
-#                                                             reverse=True,
-#                                                             key=lambda item: item[1])
-#                                         if vacancies_count_by_city[k] >= one_percent}
+               vacancy_name
 
-# file_name = input("Введите название файла: ")
-# vacancy_name = input("Введите название профессии: ")
+    @staticmethod
+    def get_fraction_by_city(processed_data):
+        """Возвращает долю вакансий по городам.
+        
+        Args: processed_data(list) - список данных о вакансиях
 
-# dataset = DataSet(file_name)
-# processed_data = dataset.process_vacancies(vacancy_name)
+        Returns: vacancies_fraction_by_city (dict) - доля вакансий по городам
+        """
+        city_count = sum(processed_data[4].values())
+        one_percent = floor(city_count / 100)
+        vacancies_fraction_by_city = {k: round(v / city_count, 4)
+                                        for k, v in sorted(processed_data[4].items(),
+                                                            reverse=True,
+                                                            key=lambda item: item[1])
+                                        if v >= one_percent}
+        return vacancies_fraction_by_city
 
-# print(f"Динамика уровня зарплат по годам: {processed_data[0]}")
-# print(f"Динамика количества вакансий по годам: {processed_data[1]}")
-# print(f"Динамика уровня зарплат по годам для выбранной профессии: {processed_data[2]}")
-# print(f"Динамика количества вакансий по годам для выбранной профессии: {processed_data[3]}")
-# print(f"Уровень зарплат по городам (в порядке убывания): {dict(list(processed_data[4].items())[:10])}")
-# print(f"Доля вакансий по городам (в порядке убывания): {dict(list(processed_data[5].items())[:10])}")
+    @staticmethod
+    def get_top_average_salary_by_city(processed_data):
+        """Возвращает топ-10 городов по средней зарплате.
+        
+        Args: processed_data(list) - список данных о вакансиях
+
+        Returns: top_average_salary_by_city (dict) - топ-10 городов по средней зарплате
+        """
+        vacancies_average_salary_by_city = {}
+        city_count = sum(processed_data[4].values())
+        one_percent = floor(city_count / 100)
+        for key in processed_data[4]:
+            vacancies_average_salary_by_city[key] = int(mean(processed_data[5][key]))
+        vacancies_top_average_salary_by_city = {k: v
+                                                for k, v in sorted(vacancies_average_salary_by_city.items(),
+                                                                    reverse=True,
+                                                                    key=lambda item: item[1])
+                                                if processed_data[4][k] >= one_percent}
+        return vacancies_top_average_salary_by_city
+
+
+def vacancies_without_multiprocessing(file_name, vacancy_name):
+
+    start = time.time()
+    dataset = DataSet(file_name)
+    processed_data = dataset.process_vacancies(vacancy_name)
+
+    print(f"Динамика уровня зарплат по годам: {processed_data[0]}")
+    print(f"Динамика количества вакансий по годам: {processed_data[1]}")
+    print(f"Динамика уровня зарплат по годам для выбранной профессии: {processed_data[2]}")
+    print(f"Динамика количества вакансий по годам для выбранной профессии: {processed_data[3]}")
+    print(f"Уровень зарплат по городам (в порядке убывания): {dict(list(DataSet.get_top_average_salary_by_city(processed_data).items())[:10])}")
+    print(f"Доля вакансий по городам (в порядке убывания): {dict(list(DataSet.get_fraction_by_city(processed_data).items())[:10])}")
+    end = time.time() - start
+    print(f"Время выполнения: {end}")
 
 
 class Report:
@@ -457,8 +462,8 @@ class Report:
         self.vacancies_count_by_year = processed_data[1]
         self.vacancies_average_salary_by_year_selected_name = processed_data[2]
         self.vacancies_count_by_year_selected_name = processed_data[3]
-        self.vacancies_top_average_salary_by_city = dict(list(processed_data[4].items())[:10])
-        self.vacancies_fraction_by_city = dict(list(processed_data[5].items())[:10])
+        self.vacancies_top_average_salary_by_city = dict(list(DataSet.get_top_average_salary_by_city(processed_data).items())[:10])
+        self.vacancies_fraction_by_city = dict(list(DataSet.get_top_average_salary_by_city(processed_data).items())[:10])
         self.vacancy_name = processed_data[6]
 
     def generate_excel(self):
@@ -668,14 +673,19 @@ class Report:
         config = pdfkit.configuration(wkhtmltopdf=r'D:\wkhtmltox\bin\wkhtmltopdf.exe')
         pdfkit.from_string(pdf_template, 'report.pdf', configuration=config, options={"enable-local-file-access": None})
 
+# file_name = input("Введите название файла: ")
+# vacancy_name = input("Введите название профессии: ")
+# dataset = DataSet(file_name)
+# processed_data = dataset.process_vacancies(vacancy_name)
 
 # report = Report(processed_data)
 # report.generate_excel()
 # report.generate_image()
 # report.generate_pdf()
 
+
 # def re_parse_year(date_string):
-#     return re.findall(r'(\d{4})-(\d{1,2})-(\d{1,2})', date_string)[0][0]
+#     return re.findall(r'(\salary_sum_dictionary{4})-(\salary_sum_dictionary{1,2})-(\salary_sum_dictionary{1,2})', date_string)[0][0]
 #
 #
 # def parse_datetime(date_string):
@@ -709,51 +719,131 @@ class Report:
 # print("slice")
 # test_datetime_parser(testData, slice_parse_year)
 
+
 def concat_vacancy_dictionaries(dictionaries):
     """Склеивает словари в один"""
-    result = {k: v for d in dictionaries for k, v in d.items()}
-    return {key:value for key, value in sorted(result.items(), key=lambda item: int(item[0]))}
+    result = {k: v for salary_sum_dictionary in dictionaries for k, v in salary_sum_dictionary.items()}
+    return result
+
+def concurrent_futures_vacancies(vacancy, directory):
+    start = time.time()
+    executor = ProcessPoolExecutor()
+    datasets = executor.map(DataSet, glob.glob(f"{directory}/*.csv"))
+    worker = partial(DataSet.process_vacancies, vacancy_name=vacancy)
+    processed_vacancies = list(executor.map(worker, datasets))
+    
+    vacancies_average_salary_by_year = concat_vacancy_dictionaries([item[0] for item in processed_vacancies])
+    vacancies_count_by_year = concat_vacancy_dictionaries([item[1] for item in processed_vacancies])
+    vacancies_average_salary_by_year_selected_name = concat_vacancy_dictionaries([item[2] for item in processed_vacancies])
+    vacancies_count_by_year_selected_name = concat_vacancy_dictionaries([item[3] for item in processed_vacancies])
+    vacancies_count_by_city = reduce(lambda x, y: x + y, [Counter(item[4]) for item in processed_vacancies])
+    vacancies_salary_sum_by_year = [item[5] for item in processed_vacancies]
+
+    city_count = sum(vacancies_count_by_city.values())
+    one_percent = floor(city_count / 100)
+    vacancies_fraction_by_city = {k: round(v / city_count, 4)
+                                for k, v in sorted(vacancies_count_by_city.items(),
+                                                    reverse=True,
+                                                    key=lambda item: item[1])
+                                if v >= one_percent}
+
+    
+    concatenated_salary_sum = dict()
+    for salary_sum_dictionary in vacancies_salary_sum_by_year:
+        for k in salary_sum_dictionary:
+            if k in concatenated_salary_sum:
+                concatenated_salary_sum[k] += salary_sum_dictionary[k]
+            else:
+                concatenated_salary_sum[k] = salary_sum_dictionary[k]
+    for key in concatenated_salary_sum:
+        concatenated_salary_sum[key] = int(mean(concatenated_salary_sum[key]))
+    vacancies_top_average_salary_by_city = {k: v
+                                            for k, v in sorted(concatenated_salary_sum.items(),
+                                                            reverse=True,
+                                                            key=lambda item: item[1])
+                                            if vacancies_count_by_city[k] >= one_percent}
+    print(f"Динамика уровня зарплат по годам: {vacancies_average_salary_by_year}")
+    print(f"Динамика количества вакансий по годам: {vacancies_count_by_year}")
+    print(f"Динамика уровня зарплат по годам для выбранной профессии: {vacancies_average_salary_by_year_selected_name}")
+    print(f"Динамика количества вакансий по годам для выбранной профессии: {vacancies_count_by_year_selected_name}")
+    print(f"Уровень зарплат по городам (в порядке убывания): {dict(list(vacancies_top_average_salary_by_city.items())[:10])}")
+    print(f"Доля вакансий по городам (в порядке убывания): {dict(list(vacancies_fraction_by_city.items())[:10])}")
+    end = time.time() - start
+    print(f"Время выполнения: {end}")
+
+
+
+def multiprocessing_vacancies(vacancy_name, directory):
+        with Pool() as pool:
+            start = time.time()
+            datasets = pool.imap(DataSet, glob.glob(f"{directory}/*.csv"))
+            datasets_with_vacancy_name = [(x,vacancy_name) for x in datasets]
+            processed_vacancies = list(pool.starmap(DataSet.process_vacancies, datasets_with_vacancy_name))
+
+            vacancies_average_salary_by_year = concat_vacancy_dictionaries([item[0] for item in processed_vacancies])
+            vacancies_count_by_year = concat_vacancy_dictionaries([item[1] for item in processed_vacancies])
+            vacancies_average_salary_by_year_selected_name = concat_vacancy_dictionaries([item[2] for item in processed_vacancies])
+            vacancies_count_by_year_selected_name = concat_vacancy_dictionaries([item[3] for item in processed_vacancies])
+            vacancies_count_by_city = reduce(lambda x, y: x + y, [Counter(item[4]) for item in processed_vacancies])
+            vacancies_salary_sum_by_year = [item[5] for item in processed_vacancies]
+
+            city_count = sum(vacancies_count_by_city.values())
+            one_percent = floor(city_count / 100)
+            vacancies_fraction_by_city = {k: round(v / city_count, 4)
+                                        for k, v in sorted(vacancies_count_by_city.items(),
+                                                            reverse=True,
+                                                            key=lambda item: item[1])
+                                        if v >= one_percent}
+
+            concatenated_salary_sum = dict()
+            for salary_sum_dictionary in vacancies_salary_sum_by_year:
+                for k in salary_sum_dictionary:
+                    if k in concatenated_salary_sum:
+                        concatenated_salary_sum[k].extend(salary_sum_dictionary[k])
+                    else:
+                        concatenated_salary_sum[k] = salary_sum_dictionary[k]
+
+            concatenated_salary_sum = {k: int(mean(v)) for k, v in concatenated_salary_sum.items()}
+
+            vacancies_top_average_salary_by_city = {k: v
+                                                    for k, v in sorted(concatenated_salary_sum.items(),
+                                                                    reverse=True,
+                                                                    key=lambda item: item[1])
+                                                    if vacancies_count_by_city[k] >= one_percent}
+                                                    
+            print(f"Динамика уровня зарплат по годам: {vacancies_average_salary_by_year}")
+            print(f"Динамика количества вакансий по годам: {vacancies_count_by_year}")
+            print(f"Динамика уровня зарплат по годам для выбранной профессии: {vacancies_average_salary_by_year_selected_name}")
+            print(f"Динамика количества вакансий по годам для выбранной профессии: {vacancies_count_by_year_selected_name}")
+            print(f"Уровень зарплат по городам (в порядке убывания): {dict(list(vacancies_top_average_salary_by_city.items())[:10])}")
+            print(f"Доля вакансий по городам (в порядке убывания): {dict(list(vacancies_fraction_by_city.items())[:10])}")
+            end = time.time() - start
+            print(f"Время выполнения: {end}")    
 
 if __name__ == "__main__":
-    with Pool() as pool:
-        dataSets = pool.imap_unordered(DataSet, glob.glob("./subprograms/chunks/*.csv"))
-        dataSets_with_vacancy_name = [(x,"Аналитик") for x in dataSets]
-        processed_vacancies = list(pool.starmap(DataSet.process_vacancies, dataSets_with_vacancy_name))
-        vacancies_average_salary_by_year = concat_vacancy_dictionaries([item[0] for item in processed_vacancies])
-        vacancies_count_by_year = concat_vacancy_dictionaries([item[1] for item in processed_vacancies])
-        vacancies_average_salary_by_year_selected_name = concat_vacancy_dictionaries([item[2] for item in processed_vacancies])
-        vacancies_count_by_year_selected_name = concat_vacancy_dictionaries([item[3] for item in processed_vacancies])
-        vacancies_count_by_city = reduce(lambda x, y: x + y, [Counter(item[7]) for item in processed_vacancies])
-        
-        city_count = sum(vacancies_count_by_city.values())
-        one_percent = floor(city_count / 100)
-        vacancies_fraction_by_city = {k: round(v / city_count, 4)
-                                      for k, v in sorted(vacancies_count_by_city.items(),
-                                                         reverse=True,
-                                                         key=lambda item: item[1])
-                                      if v >= one_percent}
+    # file_name = input("Введите название файла: ")
+    vacancy = input("Введите название профессии: ")
+    # vacancies_without_multiprocessing(file_name, vacancy)
+    
+    directory = input("Введите директорию, где находятся чанки в формате:")
+    if directory == '':
+        directory = "./subprograms/chunks"
 
-        vacancies_salary_sum_by_year = [item[8] for item in processed_vacancies]
-        res = dict()
-        for d in vacancies_salary_sum_by_year:
-            for k in d:
-                if k in res:
-                    res[k] += d[k]
-                else:
-                    res[k] = d[k]
-        for key in res:
-            res[key] = int(mean(res[key]))
-        vacancies_top_average_salary_by_city = {k: v
-                                                for k, v in sorted(res.items(),
-                                                                   reverse=True,
-                                                                   key=lambda item: item[1])
-                                                if vacancies_count_by_city[k] >= one_percent}
-        print(f"Динамика уровня зарплат по годам: {vacancies_average_salary_by_year}")
-        print(f"Динамика количества вакансий по годам: {vacancies_count_by_year}")
-        print(f"Динамика уровня зарплат по годам для выбранной профессии: {vacancies_average_salary_by_year_selected_name}")
-        print(f"Динамика количества вакансий по годам для выбранной профессии: {vacancies_count_by_year_selected_name}")
-        print(f"Уровень зарплат по городам (в порядке убывания): {dict(list(vacancies_top_average_salary_by_city.items())[:10])}")
-        print(f"Доля вакансий по городам (в порядке убывания): {dict(list(vacancies_fraction_by_city.items())[:10])}")
+    multiprocessing_vacancies(vacancy,directory)
+    # concurrent_futures_vacancies(vacancy,directory)
+    
+
+## Тесты производительности
+
+    # average_time = []
+    # for i in range(10):
+    #     start = time.time()
+    #     vacancies_without_multiprocessing("vacancies_by_year.csv","Аналитик")
+    #     end = time.time() - start
+    #     average_time.append(end)
+    # print(f"Среднее время выполнения: {mean(average_time)}")
+    
+
     
 
 
