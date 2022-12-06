@@ -24,3 +24,13 @@
 ## Chunk-splitter result
 <img src="screenshots/chunks.png"></img>
 
+## Mutiprocessing benchmark
+
+### without muiltiprocessing
+<img src="screenshots/multiprocessing-screenshots/vacancies_without_multiprocessing_mean.png"></img>
+
+### multiprocessing module
+<img src="screenshots/multiprocessing-screenshots/multiprocessing_mean.png">
+
+### concurrent.futures module
+<img src="screenshots/multiprocessing-screenshots/concurrent_futures_mean.png">

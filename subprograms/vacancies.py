@@ -842,11 +842,3 @@ if __name__ == "__main__":
     #     end = time.time() - start
     #     average_time.append(end)
     # print(f"Среднее время выполнения: {mean(average_time)}")
-    
-
-    
-
-
-
-
-
