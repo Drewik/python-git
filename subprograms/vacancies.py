@@ -825,7 +825,7 @@ if __name__ == "__main__":
     vacancy = input("Введите название профессии: ")
     # vacancies_without_multiprocessing(file_name, vacancy)
     
-    directory = input("Введите директорию, где находятся чанки в формате:")
+    directory = input("Введите директорию, где находятся чанки:")
     if directory == '':
         directory = "./subprograms/chunks"
 
