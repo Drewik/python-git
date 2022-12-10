@@ -822,9 +822,10 @@ def multiprocessing_vacancies(vacancy_name, directory):
 
 if __name__ == "__main__":
     # file_name = input("Введите название файла: ")
-    vacancy = input("Введите название профессии: ")
+    # vacancy = input("Введите название профессии: ")
     # vacancies_without_multiprocessing(file_name, vacancy)
     
+    vacancy = input("Введите название профессии: ")
     directory = input("Введите директорию, где находятся чанки:")
     if directory == '':
         directory = "./subprograms/chunks"

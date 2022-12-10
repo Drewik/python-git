@@ -22,7 +22,9 @@
 <img src="screenshots/profiling-screenshots/profile-5.png" alt="unittests">
 
 ## Chunk-splitter result
-<img src="screenshots/chunks.png"></img>
+<img src="screenshots/chunks-screenshots/chunks.png"></img>
+### dif_currencies_chunks
+<img src="screenshots/chunks-screenshots/dif_currencies_chunks.png"></img>
 
 ## Mutiprocessing benchmark
 
@@ -34,3 +36,7 @@
 
 ### concurrent.futures module
 <img src="screenshots/multiprocessing-screenshots/concurrent_futures_mean.png">
+
+## salary_currency value_counts
+<img src="screenshots/salary_currency_value_counts.png"></img>
+`>5000`: USD, KZT, BYR, UAH, EUR
