@@ -1,6 +1,6 @@
 import pandas as pd
 
-dt = pd.read_csv("vacancies_dif_currencies.csv")
+dt = pd.read_csv("vacancies_dif_currencies_with_salary.csv")
 
 
 def split_years(dt):
@@ -9,4 +9,4 @@ def split_years(dt):
 
 res = split_years(dt)
 for df in res:
-    df.to_csv("./dif_currencies_chunks/" + df['published_at'].iat[0][:4] + ".csv", encoding='utf-8', index=False)
+    df.to_csv("./dif_currencies_chunks_converted/" + df['published_at'].iat[0][:4] + ".csv", encoding='utf-8', index=False)

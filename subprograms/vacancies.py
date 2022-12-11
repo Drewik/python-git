@@ -133,7 +133,11 @@ class Vacancy:
                                  vacancy_dictionary.get("salary_to"),
                                  vacancy_dictionary.get("salary_currency"))
         except:
-            self.salary = None
+            try:
+                self.salary = Salary(vacancy_dictionary.get("salary"), vacancy_dictionary.get("salary"), "RUR")
+            except:
+                self.salary = None
+
         self.area_name = vacancy_dictionary.get("area_name")
         self.published_at = vacancy_dictionary.get("published_at")
 
@@ -331,6 +335,10 @@ class DataSet:
         vacancies_count_by_city = {}
         vacancies_objects = self.vacancies_objects
         for vacancy in vacancies_objects:
+            try:
+                vacancy.salary.rub_salary
+            except:
+                continue
             year = self.slice_parse_year(vacancy.published_at)
             if vacancy.area_name in vacancies_count_by_city:
                 vacancies_count_by_city[vacancy.area_name] += 1
@@ -821,16 +829,28 @@ def multiprocessing_vacancies(vacancy_name, directory):
             print(f"Время выполнения: {end}")    
 
 if __name__ == "__main__":
+
     # file_name = input("Введите название файла: ")
     # vacancy = input("Введите название профессии: ")
     # vacancies_without_multiprocessing(file_name, vacancy)
     
-    vacancy = input("Введите название профессии: ")
-    directory = input("Введите директорию, где находятся чанки:")
-    if directory == '':
-        directory = "./subprograms/chunks"
+## Аналитика на vacancies_by_year.csv    
+    # vacancies_without_multiprocessing("vacancies_by_year.csv", "Аналитик")
+    # multiprocessing_vacancies("Аналитик", "./subprograms/chunks")
+    # concurrent_futures_vacancies("Аналитик", "./subprograms/chunks")
 
-    multiprocessing_vacancies(vacancy,directory)
+## Аналитика на vacancies_dif_currencies_with_salary.csv (с зарплатами сконвертированными в рубли из vacancies_dif_currencies.csv) 
+## С помощью мультипроцессинга или concurrent.futures ускоряется примерно в 2 раза 
+    # vacancies_without_multiprocessing("vacancies_dif_currencies_with_salary.csv", "Аналитик")
+    # multiprocessing_vacancies("Аналитик", "./subprograms/dif_currencies_chunks_converted")
+    # concurrent_futures_vacancies("Аналитик", "./subprograms/dif_currencies_chunks_converted")
+
+    # vacancy = input("Введите название профессии: ")
+    # directory = input("Введите директорию, где находятся чанки:")
+    # if directory == '':
+    #     directory = "./subprograms/chunks"
+
+    # multiprocessing_vacancies(vacancy,directory)
     # concurrent_futures_vacancies(vacancy,directory)
     
 
