@@ -1,0 +1,52 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>template</title>
+    <style>
+        body{
+            font-family: Verdana, sans-serif;
+            margin: 0 auto;
+            text-align: center;
+        }
+        table{
+            border: 1px solid;
+            border-collapse: collapse;
+            border-spacing: 0;
+        }
+        td{
+            padding: 5px;
+            text-align: center;
+        }
+        td{
+            border: 1px solid black;
+        }
+        table tr:first-child{
+            font-weight:bold
+        }
+        .container{
+            max-width: 1500px;
+            margin: 0 auto;
+        }
+        img{
+            width: 90%;
+            margin: 0 auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Аналитика по зарплатам и городам для профессии {{vacancy_name}}</h1>
+        <img src="file:///D:/PythonProject/report/pd_graph.png">
+        <h2>Статистика по годам</h2>
+        <table id="first">
+          {% for row in range(1, sheet.max_row + 1) %}
+          <tr>
+            {% for col in range(1, sheet.max_column + 1): %}
+            <td>{{ sheet.cell(row, col).value }}</td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </table>
+    </div>
+</body>
+</html>
